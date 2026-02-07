@@ -1,0 +1,55 @@
+name: MLOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  train-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Data validation
+      run: |
+        python - <<EOF
+        import pandas as pd
+        df = pd.read_csv("data/tourism.csv")
+        assert df.shape[0] > 0
+        print("Data validation passed")
+        EOF
+
+    - name: Train model
+      run: |
+        python src/train.py
+
+    - name: Upload model to Hugging Face
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        python - <<EOF
+        from huggingface_hub import HfApi
+        api = HfApi()
+        api.upload_file(
+            path_or_fileobj="model/model.pkl",
+            path_in_repo="model.pkl",
+            repo_id="koustubhsuratran/visit-with-us-wellness-rf-model",
+            repo_type="model",
+            token="$HF_TOKEN"
+        )
+        print("Model uploaded to Hugging Face Hub")
+        EOF
